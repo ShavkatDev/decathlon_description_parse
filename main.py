@@ -134,20 +134,23 @@ def translate_json(data):
 
 def translate_to_ru():
 
-    data_ru = []
     with open('data.json', 'r') as file:
         data = json.load(file)
     
     counter = 1
+    data_ru = []
     for i in data:
-        if counter % 15 == 0:
-            add_data_to_json(data_ru)
         try:
             translated_json = translate_json(i)
             data_ru.append(translated_json)
-            print(f'[#{counter}#] Succesfully translated [{i['sku']}]')
+            print(f'[#{counter}#] Успешно переведено [{i['sku']}]')
         except Exception as ex:
-            print('[!] Error with translate:\n', ex)
+            print('[!] Ошибка с переводом:\n', ex)
+        
+        if counter % 5 == 0:
+            add_data_to_json(data_ru)
+            data_ru = []
+            print(f'[#] Записано в data_ru.json [#]')
         
         counter += 1
 
@@ -197,9 +200,6 @@ def translate_to_ru():
     # Перевод с русского на узбекский (REALIZE LATER)
     # translated_to_uzbek = translator.translate(translated_to_russian.text, src='ru', dest='uz')
     # print("Перевод на узбекский:", translated_to_uzbek.text)
-
-
-
 
 def main():
     print('[#] Запуск скрипта! [#]')    
