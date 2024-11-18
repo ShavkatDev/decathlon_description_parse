@@ -7,25 +7,14 @@ import requests
 from googletrans import Translator
 
 from config import URL_SEARCH, URL_GET_INFO, HEADERS
+from register import get_auth
+from change_description import get_id, load_description
 
 translator = Translator()
 
-def add_data_to_json(new_data, file_path='data_ru.json'):
-    try:
-        # Чтение существующих данных из файла
-        with open(file_path, 'r', encoding='utf-8') as file:
-            data = json.load(file)
-    except (FileNotFoundError, json.JSONDecodeError):
-        # Если файл не существует или пуст, создаем пустой список для данных
-        data = []
-
-    # Добавление новых данных
-    for i in new_data:
-        data.append(i)
-
-    # Запись обновленных данных в файл
+def add_data_to_json(new_data, file_path):
     with open(file_path, 'w') as file:
-        json.dump(data, file, indent=4)
+        json.dump(new_data, file, indent=4)
 
 def read_csv():
     result_list = []
@@ -140,6 +129,9 @@ def translate_to_ru():
     counter = 1
     data_ru = []
     for i in data:
+        if counter <= 3390:
+            counter += 1
+            continue
         try:
             translated_json = translate_json(i)
             data_ru.append(translated_json)
@@ -147,8 +139,8 @@ def translate_to_ru():
         except Exception as ex:
             print('[!] Ошибка с переводом:\n', ex)
         
-        if counter % 5 == 0:
-            add_data_to_json(data_ru)
+        if counter % 10 == 0:
+            add_data_to_json(data_ru, file_path=f'files/data_ru_{counter}.json')
             data_ru = []
             print(f'[#] Записано в data_ru.json [#]')
         
@@ -201,6 +193,88 @@ def translate_to_ru():
     # translated_to_uzbek = translator.translate(translated_to_russian.text, src='ru', dest='uz')
     # print("Перевод на узбекский:", translated_to_uzbek.text)
 
+def read_construct():
+    description = []
+    counter = 1
+    for file_name in os.listdir('files'):
+        file_path = os.path.join('files', file_name)
+        if os.path.isfile(file_path):  # Проверяем, что это файл
+            with open(file_path, 'r', encoding='utf-8') as file:
+                content = file.read()
+                parsed_data = json.loads(content)
+                for i in parsed_data:
+                    constructed_description = ''
+                    benefits_components = i['benefits_components']
+                    functionality_components = i['functionality_components']
+                    composition_components = i['composition_components']
+                    if benefits_components:
+                        benefit_description = """
+                                <h2>Функции</h2><div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; max-width: 800px; margin: 0;">
+                                """
+                        for benefit in benefits_components:
+                            benefits_title = benefit.get('title') or ''
+                            benefits_text = benefit.get('text') or ''
+                            image = benefit['image_url']  or ''
+                            benefit_description+=f"""
+                                <div style="padding: 10px; box-sizing: border-box; display: flex; align-items: flex-start; gap: 10px;">
+                                    <img src="{image}" alt="{benefits_title.capitalize()}" style="width: 56px; height: 56px; flex-shrink: 0;">
+                                    <div>
+                                        <h4 style="margin: 0 0 5px; font-size: 16px;">{benefits_title.capitalize()}</h4>
+                                        <p style="margin: 0; font-size: 14px; color: #555;">{benefits_text.capitalize()}</p>
+                                    </div>
+                                </div>
+                                """
+                        benefit_description += '</div>'
+                        constructed_description += benefit_description                           
+                    
+                    if functionality_components:
+                        functionality_description = '<div><h2>Советы по эксплуатации</h2>'
+                        for functional in functionality_components:
+                            functional_title = functional['title'].capitalize()
+                            functional_text = functional['text'].capitalize()
+                            functionality_description += f"<h4 style='margin: 0px'>{functional_title}</h4><p style='margin: 0px'>{functional_text}</p>"
+
+                        constructed_description += functionality_description
+
+                    if composition_components:
+                        composition_description = '<h2>Технические характеристики</h2>'
+                        for key, value in composition_components.items():
+
+                            for key, value in composition_components.items():
+                                if key == 'storage_advice' and value:
+                                    composition_description += f'<h4 style="margin: 0px">Рекомендации по хранению</h4>' + f"<p style='margin: 0px'>{value}</p>"
+                                elif key == 'approved_by' and value:
+                                    composition_description +=f'<h4 style="margin: 0px">Сертификат</h4>' + f"<p style='margin: 0px'>{value}</p>"
+                                elif key == 'composition_map' and value:
+                                    composition_description += f'<h4 style="margin: 0px">Материал</h4>' + f"<p style='margin: 0px'>{value}</p>"
+                                elif key == 'use_restriction' and value:
+                                    composition_description += f'<h4 style="margin: 0px">Инструкция по применению</h4>' + f"<p style='margin: 0px'>{value}</p>"
+                                elif key == 'lab_tests' and value:
+                                    composition_description += f'<h4 style="margin: 0px">Тестирование</h4>' + f"<p style='margin: 0px'>{value}</p>"
+                        
+                        constructed_description += composition_description + '</div>'
+
+                    description.append({'sku': i['sku'], 'description': '<div>'+constructed_description+'</div>'})
+                    if counter <= 20 and counter % 2 == 0:
+                        with open(f'html_test/page_{counter}.html', 'w',encoding='utf-8') as file:
+                            file.write(constructed_description)
+                    print(f'[#{counter}] - Success! [###]]')
+                    counter+=1
+
+    with open('csv_filename.csv', 'w', newline='', encoding='utf-8') as file:
+        writer = csv.DictWriter(file, fieldnames=['sku', 'description'])
+        writer.writeheader()  # Записываем заголовки
+        writer.writerows(description)  # Записываем данные
+
+def read_csv():
+    with open('csv_filename.csv', 'r', encoding='utf-8') as file:
+        reader = csv.DictReader(file)
+        result = []
+        for row in reader:
+            result.append({'sku': row['sku'], 'description': row['description']})
+
+    return result      
+
 def main():
     print('[#] Запуск скрипта! [#]')    
 
@@ -208,7 +282,27 @@ def main():
     # execute_script()
 
     # Эта функция для четния и дальнейшего перевода json
-    translate_to_ru()
+    # translate_to_ru()
+
+    # Эта функция для чтения csv
+    # result = read_construct()
+
+    # Добавление описания
+    headers = get_auth()
+    result_csv = read_csv()
+    counter = 1
+    for i in result_csv:
+        if counter <= 470:
+            counter+=1
+            continue
+        id = get_id(headers, i['sku'])
+        status_code = load_description(headers, id, i['description'])
+        if status_code[0] == 200:
+            print(f'[#{counter}] - Success! - [{i['sku']}]/[{id}]')
+        else:
+            print(f'[#############]\n[!!!]{i['sku']}[!!!]\n[!!!]  {status_code[0]}  [!!!]\n[#############]\n\n{status_code[1]}')
+
+        counter+=1
 
     print('[#] Скрипт закончен! [#]')
 
