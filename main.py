@@ -2,9 +2,11 @@ import os
 import csv
 import time
 import json
+import urllib3
 import requests
 
 from googletrans import Translator
+import urllib3.connection
 
 from config import URL_SEARCH, URL_GET_INFO, HEADERS
 from register import get_auth
@@ -267,7 +269,7 @@ def read_construct():
         writer.writerows(description)  # Записываем данные
 
 def read_csv():
-    with open('csv_filename.csv', 'r', encoding='utf-8') as file:
+    with open('unique_sku.csv', 'r', encoding='utf-8') as file:
         reader = csv.DictReader(file)
         result = []
         for row in reader:
@@ -292,16 +294,32 @@ def main():
     result_csv = read_csv()
     counter = 1
     for i in result_csv:
-        if counter <= 470:
+        if counter <= 3059:
             counter+=1
             continue
-        id = get_id(headers, i['sku'])
-        status_code = load_description(headers, id, i['description'])
-        if status_code[0] == 200:
-            print(f'[#{counter}] - Success! - [{i['sku']}]/[{id}]')
-        else:
-            print(f'[#############]\n[!!!]{i['sku']}[!!!]\n[!!!]  {status_code[0]}  [!!!]\n[#############]\n\n{status_code[1]}')
+        if counter % 200 == 0:
+            headers = get_auth()
+            time.sleep(10)
+        if counter % 15 == 0:
+            print('[###] - Pause 5 seconds...[###]')
+            time.sleep(5)
+        
+        try:
+            id = get_id(headers, i['sku'])
+            if 'Функции' in i['description'] or 'Советы по эксплуатации' in i['description']:
+                print(f'[#{counter}] - Already uploaded - [{i['sku']}]/[{id}]')
+                counter+=1
+                continue
+            status_code = load_description(headers, id, i['description'])
+            if status_code[0] == 200:
+                print(f'[#{counter}] - Success! - [{i['sku']}]/[{id}]')
+            else:
+                print(f'[#############]\n[!!!]{i['sku']}[!!!]\n[!!!]  {status_code[0]}  [!!!]\n[#############]\n\n')
 
+        except urllib3.connection.ConnectionError:
+            print('Time sleep due to error')
+            time.sleep(15)
+        
         counter+=1
 
     print('[#] Скрипт закончен! [#]')

@@ -31,8 +31,9 @@ def get_id(headers, sku):
 
     response = requests.post(URL, data=json.dumps(PAYLOAD), headers=headers)
     result = response.json()
-    
-    return result['data']['vendor']['products']['nodes'][0]['id']
+
+    if result['data']['vendor']['products']['nodes']:
+        return result['data']['vendor']['products']['nodes'][0]['id']
 
 def load_description(headers, id, description_new):
     PAYLOAD = {
@@ -45,6 +46,8 @@ def load_description(headers, id, description_new):
     
     response = requests.post(URL, data=json.dumps(PAYLOAD), headers=headers)
     result = response.json()
+    if "errors" in result:
+        return [999, False]
 
     description_old = json.loads(result['data']['product']['description'])
 
